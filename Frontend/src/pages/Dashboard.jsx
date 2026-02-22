@@ -485,7 +485,7 @@ const ImagePreviewModal = ({ file, onClose }) => {
         if (!file) return;
         setLoading(true); setError(null); setSrc(null);
         const token = localStorage.getItem('token');
-        const backendBase = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
+        const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
         fetch(
             `${backendBase}/api/drive/preview?accountId=${file.accountId}&fileId=${file.id}`,
             { headers: { Authorization: `Bearer ${token}` } }
@@ -699,7 +699,7 @@ const FolderExplorerItem = ({ item, accountId, onEnterFolder, onPreview }) => {
     useEffect(() => {
         if (!canPreview) return;
         const token = localStorage.getItem('token');
-        const base = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
+        const base = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
         fetch(`${base}/api/drive/preview?accountId=${accountId}&fileId=${item.id}`,
             { headers: { Authorization: `Bearer ${token}` } })
             .then(r => r.ok ? r.blob() : null)

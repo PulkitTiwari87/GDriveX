@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Settings as SettingsIcon, User, Bell, Shield, Camera } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
 
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api').replace('/api', '');
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const Settings = () => {
     const { user, updateProfile, isUpdating } = useAuthStore();
