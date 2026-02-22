@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/* ─── Tailwind v4: class-based dark mode ───────────────────────────────────
+   v4 ignores tailwind.config.js `darkMode: 'class'`.
+   This directive tells v4 to apply dark: variants when a .dark class
+   exists on any ancestor element (we toggle it on <html>).
+────────────────────────────────────────────────────────────────────────── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  .dark body {
+    @apply bg-gray-950 text-gray-100;
+  }
+
+  /* Fix Tailwind v4 border-color default (changed from gray-200 to currentColor).
+     Prevents button borders from being invisible on white backgrounds. */
+  *,
+  ::before,
+  ::after {
+    border-color: #e5e7eb;
+  }
+
+  .dark *,
+  .dark ::before,
+  .dark ::after {
+    border-color: #374151;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
