@@ -23,6 +23,13 @@ const userSchema = mongoose.Schema({
         type: String,
         default: '',
     },
+    linkedAccounts: {
+        googleId: {
+            type: String,
+            unique: true,
+            sparse: true, // This allows multiple nulls but unique IDs
+        }
+    }
 }, {
     timestamps: true,
 });
