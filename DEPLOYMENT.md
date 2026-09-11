@@ -51,3 +51,7 @@ Once deployed:
 2.  Sign up.
 3.  Try linking a Google Account.
 4.  If you get a `redirect_uri_mismatch` error, check Step 3.
+
+## 5. Continuous Integration
+
+`.github/workflows/ci.yml` runs on every push/PR to `main`: Backend unit tests (Jest) and a dependency audit, plus Frontend lint and a production build. It does not deploy anything — Render and Vercel each deploy independently from their own GitHub integration (Render/Vercel dashboards, not GitHub Actions). Treat a red CI run as a signal to fix before merging, not as a deploy gate that's currently wired up.
