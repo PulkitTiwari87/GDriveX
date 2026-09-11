@@ -253,4 +253,11 @@ const getTransferHistory = async (req, res) => {
     }
 };
 
-module.exports = { transferFile, bulkTransferFiles, getTransferHistory };
+module.exports = {
+    transferFile,
+    bulkTransferFiles,
+    getTransferHistory,
+    // exported for unit testing
+    validateTransferInput,
+    classifyError,
+};

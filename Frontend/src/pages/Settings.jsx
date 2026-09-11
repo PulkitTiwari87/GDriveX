@@ -5,7 +5,7 @@ import useAuthStore from '../store/useAuthStore';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const Settings = () => {
-    const { user, updateProfile, isUpdating } = useAuthStore();
+    const { user, updateProfile, isUpdating, changePassword } = useAuthStore();
     const [activeTab, setActiveTab] = useState('profile');
     const [name, setName] = useState(user?.name || '');
     const [bio, setBio] = useState(user?.bio || '');
@@ -13,6 +13,12 @@ const Settings = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [status, setStatus] = useState({ type: '', message: '' }); // 'success' | 'error'
     const fileInputRef = useRef(null);
+
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+    const [passwordStatus, setPasswordStatus] = useState({ type: '', message: '' });
 
     // Sync form when user data updates (e.g. on mount after fetchProfile)
     useEffect(() => {
@@ -47,6 +53,36 @@ const Settings = () => {
             setStatus({ type: 'success', message: 'Profile updated successfully!' });
         } catch {
             setStatus({ type: 'error', message: 'Failed to update profile. Please try again.' });
+        }
+    };
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        setPasswordStatus({ type: '', message: '' });
+
+        if (newPassword.length < 8) {
+            setPasswordStatus({ type: 'error', message: 'New password must be at least 8 characters long.' });
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setPasswordStatus({ type: 'error', message: 'New password and confirmation do not match.' });
+            return;
+        }
+
+        setIsChangingPassword(true);
+        try {
+            await changePassword(currentPassword, newPassword);
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setPasswordStatus({ type: 'success', message: 'Password updated successfully!' });
+        } catch (error) {
+            setPasswordStatus({
+                type: 'error',
+                message: error.response?.data?.message || 'Failed to update password. Please try again.',
+            });
+        } finally {
+            setIsChangingPassword(false);
         }
     };
 
@@ -132,7 +168,7 @@ const Settings = () => {
                                     <input
                                         ref={fileInputRef}
                                         type="file"
-                                        accept="image/*"
+                                        accept="image/jpeg,image/png,image/webp,image/gif"
                                         className="hidden"
                                         onChange={handleFileChange}
                                     />
@@ -202,20 +238,22 @@ const Settings = () => {
                     {activeTab === 'notifications' && (
                         <div className="space-y-5">
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-800 pb-3">Notification Preferences</h2>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
+                                Notification delivery isn't implemented yet — these preferences aren't saved or acted on.
+                            </p>
                             {[
                                 { label: 'Upload Notifications', desc: 'Get notified when a file upload completes.' },
                                 { label: 'Account Alerts', desc: 'Alerts about linked account status changes.' },
                                 { label: 'Storage Warnings', desc: 'Warn when a drive is almost full.' },
                             ].map((item) => (
-                                <div key={item.label} className="flex items-center justify-between py-2">
+                                <div key={item.label} className="flex items-center justify-between py-2 opacity-60">
                                     <div>
                                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.label}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.desc}</p>
                                     </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" defaultChecked className="sr-only peer" />
-                                        <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:ring-2 peer-focus:ring-indigo-400 rounded-full peer peer-checked:bg-indigo-600 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
-                                    </label>
+                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 rounded-full px-2.5 py-1 shrink-0">
+                                        Coming soon
+                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -223,26 +261,63 @@ const Settings = () => {
 
                     {/* --- SECURITY TAB --- */}
                     {activeTab === 'security' && (
-                        <div className="space-y-5">
+                        <form onSubmit={handleChangePassword} className="space-y-5">
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-800 pb-3">Security</h2>
+
+                            {passwordStatus.message && (
+                                <div className={`px-4 py-3 rounded-lg text-sm font-medium ${passwordStatus.type === 'success'
+                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                                    }`}>
+                                    {passwordStatus.message}
+                                </div>
+                            )}
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Current Password</label>
-                                <input type="password" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                <input
+                                    type="password"
+                                    value={currentPassword}
+                                    onChange={(e) => setCurrentPassword(e.target.value)}
+                                    required
+                                    autoComplete="current-password"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">New Password</label>
-                                <input type="password" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                <input
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    required
+                                    minLength={8}
+                                    autoComplete="new-password"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Confirm New Password</label>
-                                <input type="password" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                <input
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    required
+                                    minLength={8}
+                                    autoComplete="new-password"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
                             </div>
                             <div className="pt-1">
-                                <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
-                                    Update Password
+                                <button
+                                    type="submit"
+                                    disabled={isChangingPassword}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isChangingPassword ? 'Updating...' : 'Update Password'}
                                 </button>
                             </div>
-                        </div>
+                        </form>
                     )}
                 </div>
             </div>

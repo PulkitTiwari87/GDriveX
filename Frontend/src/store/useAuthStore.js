@@ -58,6 +58,12 @@ const useAuthStore = create((set) => ({
         }
     },
 
+    // Change the current user's password
+    changePassword: async (currentPassword, newPassword) => {
+        const { data } = await api.put('/auth/change-password', { currentPassword, newPassword });
+        return data;
+    },
+
     // Update profile (name, bio, profilePicture) via multipart/form-data
     updateProfile: async (formData) => {
         // Use separate `isUpdating` flag so ProtectedRoute's `isLoading` check

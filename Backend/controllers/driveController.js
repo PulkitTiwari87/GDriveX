@@ -4,6 +4,15 @@ const { getAuthUrl, getTokensFromCode, getDriveClient } = require('../services/g
 const { encrypt } = require('../utils/encryption');
 const fs = require('fs');
 
+// Every route that takes an accountId from the client (query/body/params) MUST
+// verify it belongs to the authenticated user before it is ever passed to
+// getDriveClient() — otherwise any logged-in user could read/write/delete
+// another user's linked Google Drive by guessing/enumerating an Account _id.
+const assertAccountOwnership = async (accountId, userId) => {
+    const owned = await Account.exists({ _id: accountId, user: userId });
+    return !!owned;
+};
+
 // @desc    Get Google OAuth URL
 // @route   GET /api/drive/auth-url
 const getGoogleAuthUrl = (req, res) => {
@@ -126,6 +135,9 @@ const listFolderContents = async (req, res) => {
     if (!accountId) return res.status(400).json({ message: 'accountId is required' });
 
     try {
+        if (!(await assertAccountOwnership(accountId, req.user._id))) {
+            return res.status(404).json({ message: 'Account not found or not authorized' });
+        }
         const drive = await getDriveClient(accountId);
         const response = await drive.files.list({
             pageSize: 100,
@@ -154,6 +166,9 @@ const listAllContents = async (req, res) => {
     if (!accountId) return res.status(400).json({ message: 'accountId is required' });
 
     try {
+        if (!(await assertAccountOwnership(accountId, req.user._id))) {
+            return res.status(404).json({ message: 'Account not found or not authorized' });
+        }
         const drive = await getDriveClient(accountId);
         let allItems = [];
         let pageToken = null;
@@ -190,6 +205,9 @@ const previewFile = async (req, res) => {
     if (!accountId || !fileId) return res.status(400).json({ message: 'accountId and fileId are required' });
 
     try {
+        if (!(await assertAccountOwnership(accountId, req.user._id))) {
+            return res.status(404).json({ message: 'Account not found or not authorized' });
+        }
         const drive = await getDriveClient(accountId);
 
         // Get metadata for content-type
@@ -219,6 +237,10 @@ const uploadFile = async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     try {
+        if (!(await assertAccountOwnership(accountId, req.user._id))) {
+            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+            return res.status(404).json({ message: 'Account not found or not authorized' });
+        }
         const drive = await getDriveClient(accountId);
 
         const fileMetadata = {
@@ -253,6 +275,9 @@ const uploadFile = async (req, res) => {
 const deleteFile = async (req, res) => {
     const { accountId, fileId } = req.params;
     try {
+        if (!(await assertAccountOwnership(accountId, req.user._id))) {
+            return res.status(404).json({ message: 'Account not found or not authorized' });
+        }
         const drive = await getDriveClient(accountId);
         await drive.files.delete({ fileId });
         res.json({ message: "File deleted" });
@@ -317,5 +342,6 @@ module.exports = {
     uploadFile,
     deleteFile,
     getAnalytics,
-    unlinkAccount
+    unlinkAccount,
+    assertAccountOwnership,
 };

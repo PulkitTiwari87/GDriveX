@@ -3,7 +3,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
-const { protect } = require('./middleware/authMiddleware');
 const authRoutes = require('./routes/authRoutes');
 const driveRoutes = require('./routes/driveRoutes');
 
@@ -55,6 +54,24 @@ app.get('/auth/google/callback', (req, res) => {
 
 app.get('/', (req, res) => {
     res.send('API is running...');
+});
+
+// Unknown API route fallback
+app.use('/api', (req, res) => {
+    res.status(404).json({ message: 'Not found' });
+});
+
+// Centralized error handler — catches errors passed via next(err) (e.g. from
+// multer's fileFilter) and anything else Express routes to it, so clients
+// always get a clean JSON response instead of a leaked stack trace/HTML page.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    if (res.headersSent) return;
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({
+        message: status === 500 ? 'Internal server error' : (err.message || 'Something went wrong'),
+    });
 });
 
 module.exports = app;

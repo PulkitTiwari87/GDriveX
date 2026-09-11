@@ -14,14 +14,26 @@ const generateToken = (id) => {
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'profiles');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+// Allow-list of raster image types only. `image/*` is too broad — it also
+// matches image/svg+xml, which is XML and can carry <script>, making it a
+// classic stored-XSS vector once served back from /uploads/profiles.
+const ALLOWED_IMAGE_TYPES = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+};
+
 // Multer storage — use memoryStorage so we handle saving manually
 // This avoids the timing issue where req.user might not be set yet inside diskStorage callbacks
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
     fileFilter: (req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
-            return cb(new Error('Only image files are allowed'));
+        if (!ALLOWED_IMAGE_TYPES[file.mimetype]) {
+            const err = new Error('Only JPEG, PNG, WEBP, or GIF images are allowed');
+            err.status = 400;
+            return cb(err);
         }
         cb(null, true);
     },
@@ -114,9 +126,11 @@ const updateProfile = async (req, res) => {
             user.bio = req.body.bio;
         }
 
-        // If a file was uploaded (in memory), write it to disk now
+        // If a file was uploaded (in memory), write it to disk now.
+        // The extension is derived from the validated mimetype, never from the
+        // client-supplied original filename, to prevent extension spoofing.
         if (req.file) {
-            const ext = path.extname(req.file.originalname) || '.jpg';
+            const ext = ALLOWED_IMAGE_TYPES[req.file.mimetype] || '.jpg';
             const filename = `user_${req.user._id}${ext}`;
             const filePath = path.join(UPLOAD_DIR, filename);
             fs.writeFileSync(filePath, req.file.buffer);
@@ -138,4 +152,36 @@ const updateProfile = async (req, res) => {
     }
 };
 
-module.exports = { registerUser, loginUser, getMe, updateProfile, upload };
+// @desc    Change the current user's password
+// @route   PUT /api/auth/change-password
+// @access  Private
+const changePassword = async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'currentPassword and newPassword are required' });
+    }
+    if (newPassword.length < 8) {
+        return res.status(400).json({ message: 'New password must be at least 8 characters long' });
+    }
+
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const isMatch = await user.matchPassword(currentPassword);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Current password is incorrect' });
+        }
+
+        user.password = newPassword; // re-hashed by the pre('save') hook
+        await user.save();
+
+        res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        console.error('changePassword error:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { registerUser, loginUser, getMe, updateProfile, changePassword, upload };
