@@ -12,3 +12,10 @@ build
 
 # Logs
 npm-debug.log
+
+# User-uploaded content — never commit real user files/PII to the repo
+Backend/uploads/*
+!Backend/uploads/.gitkeep
+!Backend/uploads/profiles
+Backend/uploads/profiles/*
+!Backend/uploads/profiles/.gitkeep
