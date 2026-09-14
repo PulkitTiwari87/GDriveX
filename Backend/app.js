@@ -23,12 +23,13 @@ app.use(helmet({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rate Limiting
+// Rate Limiting — scoped to /api only, so it doesn't throttle static
+// /uploads assets (profile pictures) or the OAuth callback redirect.
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
 });
-app.use(limiter);
+app.use('/api', limiter);
 
 // Logging
 if (process.env.NODE_ENV === 'development') {
@@ -55,6 +56,18 @@ app.get('/auth/google/callback', (req, res) => {
 
 app.get('/', (req, res) => {
     res.send('API is running...');
+});
+
+// Central error handler — turns thrown/multer errors into a plain JSON
+// message instead of Express's default HTML error page. Must be registered
+// last and take 4 args so Express recognizes it as an error handler.
+app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    if (err?.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ message: 'File is too large.' });
+    }
+    console.error(err);
+    res.status(err?.status || 500).json({ message: 'Something went wrong. Please try again.' });
 });
 
 module.exports = app;

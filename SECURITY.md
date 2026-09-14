@@ -8,7 +8,7 @@
 - [ ] **.env**: never commit `.env` to version control. Ensure `.gitignore` includes it.
 
 ## 2. OAuth & Token Storage
-- [x] **Encryption**: Refresh tokens are encrypted using AES-256-CBC before storage in MongoDB.
+- [x] **Encryption**: Refresh tokens are encrypted using AES-256-CBC before storage in PostgreSQL.
 - [x] **Frontend Access**: Access/Refresh tokens are never sent to the frontend. Frontend only receives a session JWT.
 - [x] **Scope**: Default scope is `https://www.googleapis.com/auth/drive`. If you only need readonly, change it in `googleDriveService.js`.
 
@@ -17,10 +17,16 @@
 - [x] **CORS**: Configured to restrict access to `CLIENT_URL`.
 - [x] **Rate Limiting**: Limited to 100 requests per 15 minutes per IP to prevent abuse.
 - [x] **Authentication**: All Drive routes are protected by JWT middleware (`protect`).
+- [x] **Account ownership**: `getDriveClient(accountId, userId)` requires a `userId` and
+      scopes the lookup to `{ _id: accountId, user: userId }`. Previously several routes
+      (`folder-contents`, `all-contents`, `preview`, `upload`, `delete`) called it with only
+      `accountId`, letting any authenticated user act on another user's linked Google account
+      by passing its ObjectId — fixed by making `userId` a required parameter with no insecure
+      fallback. Covered by `Backend/test/googleDriveService.test.js`.
 
 ## 4. Production Readiness
 - [ ] **HTTPS**: Ensure your deployment platform (Render/Vercel) serves over HTTPS.
-- [ ] **MongoDB Access**: Whitelist only your backend IP (or 0.0.0.0/0 with strong password if using Atlas serverless).
+- [ ] **PostgreSQL Access**: Restrict database access to your backend's IP where your provider supports it; always use a strong password and an SSL connection string (`?sslmode=require`).
 - [ ] **Logging**: Morgan logging is enabled for `development`. Consider proper logging service for production.
 
 ## 5. Deployment Checks

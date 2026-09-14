@@ -30,10 +30,10 @@ const Login = () => {
                     <div className="flex justify-between items-center h-16">
                         {/* Logo */}
                         <Link to="/" className="flex items-center gap-2">
-                            <div className="bg-indigo-600 p-2 rounded-lg">
+                            <div className="bg-teal-600 p-2 rounded-lg">
                                 <HardDrive className="w-5 h-5 text-white" />
                             </div>
-                            <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                            <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-cyan-600">
                                 G-DriveX
                             </span>
                         </Link>
@@ -43,19 +43,20 @@ const Login = () => {
                             <button
                                 onClick={toggleTheme}
                                 title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all active:scale-[0.97]"
                             >
                                 {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                             </button>
                             <Link
                                 to="/register"
-                                className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                             >
                                 Create account
                             </Link>
                             <Link
                                 to="/register"
-                                className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-medium transition-colors"
+                                className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-full font-medium transition-colors"
                             >
                                 Get Started
                             </Link>
@@ -65,10 +66,14 @@ const Login = () => {
             </nav>
 
             {/* Form Card */}
-            <div className="flex items-center justify-center px-4 py-20">
-                <div className="max-w-md w-full p-8 bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 transition-colors duration-300">
+            <div className="relative flex items-center justify-center px-4 py-20 overflow-hidden">
+                <div className="pointer-events-none absolute inset-0 -z-10">
+                    <div className="animate-float absolute top-10 left-10 w-64 h-64 bg-teal-300/20 dark:bg-teal-600/10 rounded-full blur-3xl" />
+                    <div className="animate-float-slow absolute bottom-10 right-10 w-72 h-72 bg-cyan-300/20 dark:bg-cyan-600/10 rounded-full blur-3xl" />
+                </div>
+                <div className="animate-fade-in max-w-md w-full p-8 bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 transition-colors duration-300">
                     <div className="text-center mb-8">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 mb-4">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 mb-4">
                             <FolderOpen className="w-6 h-6" />
                         </div>
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Welcome back</h2>
@@ -89,7 +94,7 @@ const Login = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                 placeholder="you@example.com"
                             />
                         </div>
@@ -100,14 +105,14 @@ const Login = () => {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                 placeholder="••••••••"
                             />
                         </div>
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                            className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed mt-2"
                         >
                             {isLoading ? 'Signing in...' : 'Sign In'}
                         </button>
@@ -115,7 +120,7 @@ const Login = () => {
 
                     <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
                         Don't have an account?{' '}
-                        <Link to="/register" className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">
+                        <Link to="/register" className="text-teal-600 dark:text-teal-400 font-medium hover:underline">
                             Create account
                         </Link>
                     </p>

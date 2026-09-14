@@ -3,7 +3,7 @@ node_modules
 
 # Env files
 .env
-frontend/.env
+Frontend/.env
 Backend/.env
 
 # Build folders
@@ -12,3 +12,8 @@ build
 
 # Logs
 npm-debug.log
+
+# User-uploaded content (profile pictures etc.) — not source, must not be committed
+Backend/uploads/*
+!Backend/uploads/.gitkeep
+!Backend/uploads/profiles/.gitkeep

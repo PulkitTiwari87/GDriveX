@@ -1,8 +1,19 @@
 const { google } = require('googleapis');
-const Account = require('../models/Account');
+const { prisma } = require('../config/db');
 const { getAuthUrl, getTokensFromCode, getDriveClient } = require('../services/googleDriveService');
 const { encrypt } = require('../utils/encryption');
+const { toClient, toClientList } = require('../utils/serialize');
 const fs = require('fs');
+
+// Fields safe to send to the frontend — never include token columns.
+const PUBLIC_ACCOUNT_FIELDS = {
+    id: true,
+    googleId: true,
+    email: true,
+    picture: true,
+    createdAt: true,
+    updatedAt: true,
+};
 
 // @desc    Get Google OAuth URL
 // @route   GET /api/drive/auth-url
@@ -26,39 +37,42 @@ const linkGoogleAccount = async (req, res) => {
         const userInfo = await oauth2.userinfo.get();
 
         // Check if account already linked
-        let account = await Account.findOne({ user: req.user._id, googleId: userInfo.data.id });
+        const existing = await prisma.account.findFirst({
+            where: { userId: req.user._id, googleId: userInfo.data.id },
+        });
 
-        if (account) {
-            // Update tokens
+        if (existing) {
+            const data = { accessToken: tokens.access_token, expiryDate: tokens.expiry_date };
             if (tokens.refresh_token) {
-                account.tokens.refreshToken = encrypt(tokens.refresh_token);
+                const encrypted = encrypt(tokens.refresh_token);
+                data.refreshTokenIv = encrypted.iv;
+                data.refreshTokenData = encrypted.encryptedData;
             }
-            account.tokens.accessToken = tokens.access_token;
-            account.tokens.expiryDate = tokens.expiry_date;
-            await account.save();
-            return res.json({ message: 'Account re-linked successfully', account });
+            const updated = await prisma.account.update({ where: { id: existing.id }, data });
+            return res.json({ message: 'Account re-linked successfully', account: toClient(updated) });
         }
 
         if (!tokens.refresh_token) {
             return res.status(400).json({ message: 'No refresh token received. You may need to revoke access and try again.' });
         }
 
-        const newAccount = new Account({
-            user: req.user._id,
-            googleId: userInfo.data.id,
-            email: userInfo.data.email,
-            picture: userInfo.data.picture,
-            tokens: {
+        const encrypted = encrypt(tokens.refresh_token);
+        const newAccount = await prisma.account.create({
+            data: {
+                userId: req.user._id,
+                googleId: userInfo.data.id,
+                email: userInfo.data.email,
+                picture: userInfo.data.picture,
                 accessToken: tokens.access_token,
-                refreshToken: encrypt(tokens.refresh_token),
+                refreshTokenIv: encrypted.iv,
+                refreshTokenData: encrypted.encryptedData,
                 expiryDate: tokens.expiry_date,
                 tokenType: tokens.token_type,
-                scope: tokens.scope
-            }
+                scope: tokens.scope,
+            },
         });
 
-        await newAccount.save();
-        res.status(201).json(newAccount);
+        res.status(201).json(toClient(newAccount));
 
     } catch (error) {
         console.error(error);
@@ -70,8 +84,11 @@ const linkGoogleAccount = async (req, res) => {
 // @route   GET /api/drive/accounts
 const getAccounts = async (req, res) => {
     try {
-        const accounts = await Account.find({ user: req.user._id }).select('-tokens');
-        res.json(accounts);
+        const accounts = await prisma.account.findMany({
+            where: { userId: req.user._id },
+            select: PUBLIC_ACCOUNT_FIELDS,
+        });
+        res.json(toClientList(accounts));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -81,13 +98,13 @@ const getAccounts = async (req, res) => {
 // @route   GET /api/drive/files
 const listFiles = async (req, res) => {
     try {
-        const accounts = await Account.find({ user: req.user._id });
+        const accounts = await prisma.account.findMany({ where: { userId: req.user._id } });
         let allFiles = [];
 
         // Run in parallel
         const promises = accounts.map(async (account) => {
             try {
-                const drive = await getDriveClient(account._id);
+                const drive = await getDriveClient(account.id, req.user._id);
                 const response = await drive.files.list({
                     pageSize: 20, // Limit for demo
                     fields: 'nextPageToken, files(id, name, mimeType, webViewLink, iconLink, size, createdTime)',
@@ -96,7 +113,7 @@ const listFiles = async (req, res) => {
 
                 return response.data.files.map(file => ({
                     ...file,
-                    accountId: account._id,
+                    accountId: account.id,
                     accountEmail: account.email
                 }));
             } catch (err) {
@@ -126,7 +143,7 @@ const listFolderContents = async (req, res) => {
     if (!accountId) return res.status(400).json({ message: 'accountId is required' });
 
     try {
-        const drive = await getDriveClient(accountId);
+        const drive = await getDriveClient(accountId, req.user._id);
         const response = await drive.files.list({
             pageSize: 100,
             fields: 'nextPageToken, files(id, name, mimeType, webViewLink, iconLink, size, createdTime, parents)',
@@ -154,7 +171,7 @@ const listAllContents = async (req, res) => {
     if (!accountId) return res.status(400).json({ message: 'accountId is required' });
 
     try {
-        const drive = await getDriveClient(accountId);
+        const drive = await getDriveClient(accountId, req.user._id);
         let allItems = [];
         let pageToken = null;
 
@@ -190,7 +207,7 @@ const previewFile = async (req, res) => {
     if (!accountId || !fileId) return res.status(400).json({ message: 'accountId and fileId are required' });
 
     try {
-        const drive = await getDriveClient(accountId);
+        const drive = await getDriveClient(accountId, req.user._id);
 
         // Get metadata for content-type
         const meta = await drive.files.get({ fileId, fields: 'mimeType,name,size' });
@@ -219,7 +236,7 @@ const uploadFile = async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     try {
-        const drive = await getDriveClient(accountId);
+        const drive = await getDriveClient(accountId, req.user._id);
 
         const fileMetadata = {
             name: req.file.originalname,
@@ -253,7 +270,7 @@ const uploadFile = async (req, res) => {
 const deleteFile = async (req, res) => {
     const { accountId, fileId } = req.params;
     try {
-        const drive = await getDriveClient(accountId);
+        const drive = await getDriveClient(accountId, req.user._id);
         await drive.files.delete({ fileId });
         res.json({ message: "File deleted" });
     } catch (error) {
@@ -265,13 +282,13 @@ const deleteFile = async (req, res) => {
 // @route GET /api/drive/analytics
 const getAnalytics = async (req, res) => {
     try {
-        const accounts = await Account.find({ user: req.user._id });
+        const accounts = await prisma.account.findMany({ where: { userId: req.user._id } });
         const analytics = await Promise.all(accounts.map(async account => {
             try {
-                const drive = await getDriveClient(account._id);
+                const drive = await getDriveClient(account.id, req.user._id);
                 const about = await drive.about.get({ fields: 'storageQuota' });
                 return {
-                    accountId: account._id,
+                    accountId: account.id,
                     email: account.email,
                     usage: about.data.storageQuota.usage,
                     limit: about.data.storageQuota.limit,
@@ -279,7 +296,7 @@ const getAnalytics = async (req, res) => {
                     usageInTrash: about.data.storageQuota.usageInTrash
                 };
             } catch (err) {
-                return { accountId: account._id, email: account.email, error: "Failed to fetch" };
+                return { accountId: account.id, email: account.email, error: "Failed to fetch" };
             }
         }));
         res.json(analytics);
@@ -293,13 +310,13 @@ const getAnalytics = async (req, res) => {
 const unlinkAccount = async (req, res) => {
     const { accountId } = req.params;
     try {
-        const account = await Account.findOne({ _id: accountId, user: req.user._id });
+        const account = await prisma.account.findFirst({ where: { id: accountId, userId: req.user._id } });
 
         if (!account) {
             return res.status(404).json({ message: 'Account not found' });
         }
 
-        await Account.deleteOne({ _id: accountId });
+        await prisma.account.delete({ where: { id: accountId } });
         res.json({ message: 'Account unlinked successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message });

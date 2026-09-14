@@ -27,9 +27,9 @@ const AuthCallback = () => {
     }, [code, navigate]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col">
-            <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-            <h2 className="text-xl font-medium text-gray-900">Linking your Google Account...</h2>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 flex-col transition-colors duration-300">
+            <Loader2 className="w-10 h-10 text-teal-600 dark:text-teal-400 animate-spin mb-4" />
+            <h2 className="text-xl font-medium text-gray-900 dark:text-gray-100">Linking your Google Account...</h2>
         </div>
     );
 };

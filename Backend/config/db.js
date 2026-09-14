@@ -1,13 +1,17 @@
-const mongoose = require('mongoose');
+const { PrismaClient } = require('@prisma/client');
 
+const prisma = new PrismaClient();
+
+// Fail fast on startup if Postgres isn't reachable, matching the previous
+// Mongoose behaviour (connectDB() used to exit the process on failure).
 const connectDB = async () => {
     try {
-        const conn = await mongoose.connect(process.env.MONGODB_URI);
-        console.log(`MongoDB Connected: ${conn.connection.host}`);
+        await prisma.$connect();
+        console.log('PostgreSQL connected');
     } catch (error) {
         console.error(`Error: ${error.message}`);
         process.exit(1);
     }
 };
 
-module.exports = connectDB;
+module.exports = { prisma, connectDB };

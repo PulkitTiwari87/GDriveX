@@ -17,8 +17,9 @@ const {
 } = require('../controllers/driveController');
 const { transferFile, bulkTransferFiles, getTransferHistory } = require('../controllers/transferController');
 
-// Multer Setup
-const upload = multer({ dest: 'uploads/' });
+// Multer Setup — capped so a single request can't exhaust server disk/memory
+// before the file is streamed on to Google Drive.
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 200 * 1024 * 1024 } }); // 200 MB
 
 // Drive Routes
 router.get('/auth-url', protect, getGoogleAuthUrl);

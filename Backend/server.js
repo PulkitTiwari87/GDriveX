@@ -1,9 +1,10 @@
 const dotenv = require('dotenv');
-// Load env vars first
-dotenv.config();
+// Load env vars first (quiet: true suppresses dotenv's unrelated promotional
+// "tip" line on every server start — https://github.com/motdotla/dotenv)
+dotenv.config({ quiet: true });
 
 const app = require('./app');
-const connectDB = require('./config/db');
+const { connectDB } = require('./config/db');
 
 // Connect to Database
 // Connect to Database

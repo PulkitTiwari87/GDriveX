@@ -1,6 +1,6 @@
 const { getDriveClient } = require('../services/googleDriveService');
-const Account = require('../models/Account');
-const Transfer = require('../models/Transfer');
+const { prisma } = require('../config/db');
+const { toClient, toClientList } = require('../utils/serialize');
 const { PassThrough } = require('stream');
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -121,26 +121,28 @@ const transferFile = async (req, res) => {
 
     // Verify ownership of both accounts
     const [sourceAccount, targetAccount] = await Promise.all([
-        Account.findOne({ _id: sourceAccountId, user: req.user._id }),
-        Account.findOne({ _id: targetAccountId, user: req.user._id }),
+        prisma.account.findFirst({ where: { id: sourceAccountId, userId: req.user._id } }),
+        prisma.account.findFirst({ where: { id: targetAccountId, userId: req.user._id } }),
     ]);
     if (!sourceAccount) return res.status(404).json({ message: 'Source account not found or not authorized' });
     if (!targetAccount) return res.status(404).json({ message: 'Target account not found or not authorized' });
 
-    const transferLog = await Transfer.create({
-        userId: req.user._id,
-        sourceAccountId,
-        targetAccountId,
-        fileId,
-        fileName: 'unknown',
-        action,
-        status: 'in_progress',
+    let transferLog = await prisma.transfer.create({
+        data: {
+            userId: req.user._id,
+            sourceAccountId,
+            targetAccountId,
+            fileId,
+            fileName: 'unknown',
+            action,
+            status: 'in_progress',
+        },
     });
 
     try {
         const [sourceDrive, targetDrive] = await Promise.all([
-            getDriveClient(sourceAccountId),
-            getDriveClient(targetAccountId),
+            getDriveClient(sourceAccountId, req.user._id),
+            getDriveClient(targetAccountId, req.user._id),
         ]);
 
         console.log(`[Transfer] Starting ${action} of fileId "${fileId}"`);
@@ -148,9 +150,10 @@ const transferFile = async (req, res) => {
             sourceDrive, targetDrive, fileId, action,
         });
 
-        transferLog.fileName = fileName;
-        transferLog.status = 'completed';
-        await transferLog.save();
+        transferLog = await prisma.transfer.update({
+            where: { id: transferLog.id },
+            data: { fileName, status: 'completed' },
+        });
 
         return res.json({
             success: true,
@@ -159,15 +162,16 @@ const transferFile = async (req, res) => {
             uploadedFileId: uploadedFile.id,
             uploadedFileLink: uploadedFile.webViewLink,
             targetAccount: targetAccount.email,
-            transferId: transferLog._id,
+            transferId: transferLog.id,
         });
 
     } catch (err) {
         console.error('[Transfer] Error:', err.message || err);
-        transferLog.status = 'failed';
-        transferLog.errorMessage = err.message || 'Unknown error';
-        await transferLog.save();
-        return res.status(500).json({ message: classifyError(err), transferId: transferLog._id });
+        transferLog = await prisma.transfer.update({
+            where: { id: transferLog.id },
+            data: { status: 'failed', errorMessage: err.message || 'Unknown error' },
+        });
+        return res.status(500).json({ message: classifyError(err), transferId: transferLog.id });
     }
 };
 
@@ -187,15 +191,15 @@ const bulkTransferFiles = async (req, res) => {
         return res.status(400).json({ message: 'Maximum 50 files per bulk transfer' });
 
     const [sourceAccount, targetAccount] = await Promise.all([
-        Account.findOne({ _id: sourceAccountId, user: req.user._id }),
-        Account.findOne({ _id: targetAccountId, user: req.user._id }),
+        prisma.account.findFirst({ where: { id: sourceAccountId, userId: req.user._id } }),
+        prisma.account.findFirst({ where: { id: targetAccountId, userId: req.user._id } }),
     ]);
     if (!sourceAccount) return res.status(404).json({ message: 'Source account not found or not authorized' });
     if (!targetAccount) return res.status(404).json({ message: 'Target account not found or not authorized' });
 
     const [sourceDrive, targetDrive] = await Promise.all([
-        getDriveClient(sourceAccountId),
-        getDriveClient(targetAccountId),
+        getDriveClient(sourceAccountId, req.user._id),
+        getDriveClient(targetAccountId, req.user._id),
     ]);
 
     const results = await Promise.allSettled(
@@ -216,14 +220,16 @@ const bulkTransferFiles = async (req, res) => {
     // Log each transfer
     await Promise.allSettled(
         succeeded.map(({ fileId, fileName }) =>
-            Transfer.create({
-                userId: req.user._id,
-                sourceAccountId,
-                targetAccountId,
-                fileId,
-                fileName,
-                action,
-                status: 'completed',
+            prisma.transfer.create({
+                data: {
+                    userId: req.user._id,
+                    sourceAccountId,
+                    targetAccountId,
+                    fileId,
+                    fileName,
+                    action,
+                    status: 'completed',
+                },
             })
         )
     );
@@ -242,15 +248,26 @@ const bulkTransferFiles = async (req, res) => {
 // @access Private
 const getTransferHistory = async (req, res) => {
     try {
-        const transfers = await Transfer.find({ userId: req.user._id })
-            .sort({ createdAt: -1 })
-            .limit(50)
-            .populate('sourceAccountId', 'email')
-            .populate('targetAccountId', 'email');
-        res.json(transfers);
+        const transfers = await prisma.transfer.findMany({
+            where: { userId: req.user._id },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            include: {
+                sourceAccount: { select: { id: true, email: true } },
+                targetAccount: { select: { id: true, email: true } },
+            },
+        });
+        res.json(toClientList(transfers));
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 };
 
-module.exports = { transferFile, bulkTransferFiles, getTransferHistory };
+module.exports = {
+    transferFile,
+    bulkTransferFiles,
+    getTransferHistory,
+    // exported for unit testing
+    validateTransferInput,
+    classifyError,
+};

@@ -13,13 +13,17 @@ Render is great for Node.js backends.
 3.  **Environment Variables**:
     Add the following in Render Dashboard:
     *   `NODE_ENV`: `production`
-    *   `MONGODB_URI`: Your Atlas Connection String
+    *   `DATABASE_URL`: Your PostgreSQL connection string (Render Postgres, Neon, or Supabase all work)
     *   `GOOGLE_CLIENT_ID`: From Google Cloud Console
     *   `GOOGLE_CLIENT_SECRET`: From Google Cloud Console
     *   `GENERIC_REDIRECT_URI`: `https://your-frontend-domain.vercel.app/auth/callback` (See Frontend step)
     *   `ENCRYPTION_KEY`: Your 32-byte hex key
     *   `JWT_SECRET`: Strong secret
     *   `CLIENT_URL`: `https://your-frontend-domain.vercel.app`
+4.  **Apply the database schema** (once, or on every deploy via a Render "pre-deploy" command):
+    ```bash
+    npx prisma migrate deploy
+    ```
 
 ## 2. Frontend Deployment (Vercel)
 

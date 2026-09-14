@@ -1,12 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import useDriveStore from '../store/useDriveStore';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { Loader2 } from 'lucide-react';
 
 const Analytics = () => {
     const { analytics, fetchAnalytics } = useDriveStore();
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetchAnalytics();
+        fetchAnalytics().finally(() => setIsLoading(false));
     }, []);
 
     const formatBytes = (bytes) => {
@@ -21,6 +23,12 @@ const Analytics = () => {
         <div className="space-y-6">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Storage Analytics</h1>
 
+            {isLoading ? (
+                <div className="p-16 text-center text-gray-400 flex flex-col items-center gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+                    <span className="text-sm">Loading storage analytics…</span>
+                </div>
+            ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {analytics.map((acc) => {
                     const used = parseInt(acc.usage || 0);
@@ -56,7 +64,7 @@ const Analytics = () => {
                                             paddingAngle={5}
                                             dataKey="value"
                                         >
-                                            <Cell key="cell-used" fill="#4F46E5" />
+                                            <Cell key="cell-used" fill="#0d9488" />
                                             <Cell key="cell-free" fill="#E5E7EB" />
                                         </Pie>
                                         <Tooltip formatter={(value) => formatBytes(value)} />
@@ -69,8 +77,8 @@ const Analytics = () => {
                             <div className="mt-2 mb-4">
                                 <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                                     <div
-                                        className={`h-full rounded-full transition-all ${pct > 80 ? 'bg-red-500' : 'bg-indigo-500'}`}
-                                        style={{ width: `${Math.min(pct, 100)}%` }}
+                                        className={`h-full w-full origin-left rounded-full transition-transform duration-[var(--dur-slow)] ease-[var(--ease-out)] ${pct > 80 ? 'bg-red-500' : 'bg-teal-500'}`}
+                                        style={{ transform: `scaleX(${Math.min(pct, 100) / 100})` }}
                                     />
                                 </div>
                             </div>
@@ -93,8 +101,9 @@ const Analytics = () => {
                     );
                 })}
             </div>
+            )}
 
-            {analytics.length === 0 && (
+            {!isLoading && analytics.length === 0 && (
                 <div className="text-center p-12 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
                     <p className="text-gray-500 dark:text-gray-400">No analytics available. Start by linking a drive account.</p>
                 </div>

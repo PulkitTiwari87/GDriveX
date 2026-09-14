@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Font faces are imported from main.tsx (not here) so Vite's JS-driven asset
+   pipeline resolves and hashes the woff2 files correctly in production. */
 
 /* ─── Tailwind v4: class-based dark mode ───────────────────────────────────
    v4 ignores tailwind.config.js `darkMode: 'class'`.
@@ -6,6 +8,22 @@
    exists on any ancestor element (we toggle it on <html>).
 ────────────────────────────────────────────────────────────────────────── */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── Design tokens ──────────────────────────────────────────────────────────
+   Tailwind v4 theme block: these become real utilities (font-display,
+   bg-lane-work, text-lane-backup, etc.) instead of one-off hex values
+   scattered through components. The lane colors are the "convergence"
+   metaphor's three account streams (Personal / Work / Backup) — used only
+   for that purpose, not as decoration elsewhere.
+────────────────────────────────────────────────────────────────────────── */
+@theme {
+  --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Space Grotesk', ui-sans-serif, sans-serif;
+
+  --color-lane-personal: #0d9488; /* teal — brand accent */
+  --color-lane-work: #7c6cf6;     /* violet */
+  --color-lane-backup: #e8a13a;   /* amber */
+}
 
 @layer base {
   html {
@@ -17,7 +35,7 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-gray-50 text-gray-900 font-sans;
   }
 
   .dark body {
@@ -40,5 +58,161 @@
 
   button {
     cursor: pointer;
+  }
+}
+
+/* ─── Motion system ──────────────────────────────────────────────────────────
+   Five duration tiers + named easings, shared by every animation in the app
+   (CSS classes and JS hooks alike) instead of one-off values per component.
+   transform/opacity only — never layout properties — for GPU-cheap motion.
+────────────────────────────────────────────────────────────────────────── */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* one signature moment only, used sparingly */
+
+  --dur-micro: 120ms;
+  --dur-fast: 200ms;
+  --dur-normal: 350ms;
+  --dur-slow: 600ms;
+  --dur-cinematic: 1100ms;
+}
+
+/* ─── Motion utilities ──────────────────────────────────────────────────────
+   Small, dependency-free animation primitives used across the landing page
+   and other polish spots. Reveal-on-scroll is driven by a tiny
+   IntersectionObserver hook (useReveal) that toggles `.is-visible`.
+────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Variants — deliberately different from .reveal's fade-up so scroll motion
+     has hierarchy instead of one identical animation repeated down the page. */
+  .reveal-fade {
+    opacity: 0;
+    transition: opacity var(--dur-slow) var(--ease-out);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal-fade.is-visible { opacity: 1; }
+
+  .reveal-scale {
+    opacity: 0;
+    transform: scale(0.94);
+    transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal-scale.is-visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .reveal-side {
+    opacity: 0;
+    transform: translateX(var(--reveal-x, -24px));
+    transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal-side.is-visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(0, -18px) scale(1.03); }
+}
+
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Decorative, purely ambient loops (blurred blobs, gradient shimmer) — only
+   run when the user hasn't asked for reduced motion. Static fallback below
+   keeps the same visual composition without the slow oscillation. */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-float {
+    animation: float 7s ease-in-out infinite;
+  }
+  .animate-float-slow {
+    animation: float 11s ease-in-out infinite;
+  }
+  .animate-gradient-x {
+    background-size: 200% 200%;
+    animation: gradient-x 6s ease infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-gradient-x {
+    background-size: 200% 200%;
+    background-position: 50% 50%;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out both;
+}
+
+/* Popover/menu entrance, scaled from the trigger corner instead of a plain
+   fade — pairs with `transform-origin` set per-usage (see Dashboard.jsx). */
+@keyframes menu-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-menu-in {
+  animation: menu-in var(--dur-fast) var(--ease-out) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-menu-in {
+    animation: fade-in var(--dur-fast) var(--ease-out) both;
+  }
+}
+
+/* Toast entrance — slides in from the same edge (right) it exits toward, so
+   the enter/exit paths mirror each other instead of a plain fade in / slide
+   out mismatch. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-toast-in {
+  animation: toast-in var(--dur-fast) var(--ease-out) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-toast-in {
+    animation: fade-in var(--dur-fast) var(--ease-out) both;
+  }
+}
+
+/* Indeterminate top-of-screen progress bar (transfer in flight) — the inner
+   bar sweeps via `transform` (compositor-friendly) inside an overflow-hidden
+   track, instead of animating `width`. */
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .animate-indeterminate {
+    animation: indeterminate 1.4s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-indeterminate {
+    transform: translateX(100%);
   }
 }

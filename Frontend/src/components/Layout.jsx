@@ -37,12 +37,12 @@ const Layout = () => {
     const initials = user?.name?.[0]?.toUpperCase() || '?';
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
+        <div className="flex h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
             {/* Sidebar */}
-            <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 hidden md:flex flex-col">
+            <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 hidden md:flex flex-col transition-colors duration-300">
                 {/* Logo */}
                 <div className="p-6">
-                    <h1 className="text-2xl font-bold text-indigo-600 flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-teal-600 flex items-center gap-2">
                         <FolderOpen className="w-8 h-8" />
                         G-DriveX
                     </h1>
@@ -58,9 +58,9 @@ const Layout = () => {
                                 key={item.path}
                                 to={item.path}
                                 className={clsx(
-                                    'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                                    'flex items-center gap-3 px-4 py-3 rounded-lg transition-all active:scale-[0.98]',
                                     isActive
-                                        ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium'
+                                        ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 font-medium'
                                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
                                 )}
                             >
@@ -76,7 +76,7 @@ const Layout = () => {
                     {/* Dark mode toggle */}
                     <button
                         onClick={toggleTheme}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-all active:scale-[0.98]"
                         title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                     >
                         {theme === 'dark'
@@ -93,10 +93,10 @@ const Layout = () => {
                             <img
                                 src={avatarUrl}
                                 alt={user?.name}
-                                className="w-9 h-9 rounded-full object-cover ring-2 ring-indigo-200 dark:ring-indigo-700 shrink-0"
+                                className="w-9 h-9 rounded-full object-cover ring-2 ring-teal-200 dark:ring-teal-700 shrink-0"
                             />
                         ) : (
-                            <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold text-sm shrink-0">
+                            <div className="w-9 h-9 rounded-full bg-teal-100 dark:bg-teal-900 flex items-center justify-center text-teal-600 dark:text-teal-300 font-bold text-sm shrink-0">
                                 {initials}
                             </div>
                         )}
@@ -111,7 +111,7 @@ const Layout = () => {
                     {/* Logout */}
                     <button
                         onClick={handleLogout}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all active:scale-[0.98]"
                     >
                         <LogOut className="w-5 h-5" />
                         Logout
@@ -120,7 +120,7 @@ const Layout = () => {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
+            <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
                 <div className="p-8">
                     <Outlet />
                 </div>

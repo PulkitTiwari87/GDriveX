@@ -1,8 +1,9 @@
-const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { prisma } = require('../config/db');
+const { hashPassword, verifyPassword } = require('../utils/password');
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -27,28 +28,35 @@ const upload = multer({
     },
 });
 
+const toClientUser = (user) => ({
+    _id: user.id,
+    name: user.name,
+    email: user.email,
+    bio: user.bio,
+    profilePicture: user.profilePicture,
+});
+
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
 const registerUser = async (req, res) => {
     const { name, email, password } = req.body;
     try {
-        const userExists = await User.findOne({ email });
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: 'name, email, and password are required' });
+        }
+        if (password.length < 8) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters' });
+        }
+
+        const userExists = await prisma.user.findUnique({ where: { email } });
         if (userExists) return res.status(400).json({ message: 'User already exists' });
 
-        const user = await User.create({ name, email, password });
-        if (user) {
-            res.status(201).json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                bio: user.bio,
-                profilePicture: user.profilePicture,
-                token: generateToken(user._id),
-            });
-        } else {
-            res.status(400).json({ message: 'Invalid user data' });
-        }
+        const user = await prisma.user.create({
+            data: { name, email, password: await hashPassword(password) },
+        });
+
+        res.status(201).json({ ...toClientUser(user), token: generateToken(user.id) });
     } catch (error) {
         console.error('registerUser error:', error);
         res.status(500).json({ message: error.message });
@@ -61,16 +69,9 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
     const { email, password } = req.body;
     try {
-        const user = await User.findOne({ email });
-        if (user && (await user.matchPassword(password))) {
-            res.json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                bio: user.bio,
-                profilePicture: user.profilePicture,
-                token: generateToken(user._id),
-            });
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (user && (await verifyPassword(password, user.password))) {
+            res.json({ ...toClientUser(user), token: generateToken(user.id) });
         } else {
             res.status(401).json({ message: 'Invalid email or password' });
         }
@@ -85,14 +86,9 @@ const loginUser = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
     try {
-        const user = await User.findById(req.user._id).select('-password');
-        res.json({
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            bio: user.bio,
-            profilePicture: user.profilePicture,
-        });
+        const user = await prisma.user.findUnique({ where: { id: req.user._id } });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        res.json(toClientUser(user));
     } catch (error) {
         console.error('getMe error:', error);
         res.status(500).json({ message: error.message });
@@ -104,14 +100,12 @@ const getMe = async (req, res) => {
 // @access  Private
 const updateProfile = async (req, res) => {
     try {
-        const user = await User.findById(req.user._id);
-        if (!user) return res.status(404).json({ message: 'User not found' });
-
+        const data = {};
         if (req.body.name !== undefined && req.body.name.trim()) {
-            user.name = req.body.name.trim();
+            data.name = req.body.name.trim();
         }
         if (req.body.bio !== undefined) {
-            user.bio = req.body.bio;
+            data.bio = req.body.bio;
         }
 
         // If a file was uploaded (in memory), write it to disk now
@@ -120,22 +114,50 @@ const updateProfile = async (req, res) => {
             const filename = `user_${req.user._id}${ext}`;
             const filePath = path.join(UPLOAD_DIR, filename);
             fs.writeFileSync(filePath, req.file.buffer);
-            user.profilePicture = `/uploads/profiles/${filename}`;
+            data.profilePicture = `/uploads/profiles/${filename}`;
         }
 
-        const updated = await user.save();
-
-        res.json({
-            _id: updated._id,
-            name: updated.name,
-            email: updated.email,
-            bio: updated.bio,
-            profilePicture: updated.profilePicture,
-        });
+        const updated = await prisma.user.update({ where: { id: req.user._id }, data });
+        res.json(toClientUser(updated));
     } catch (error) {
         console.error('updateProfile error:', error);
         res.status(500).json({ message: error.message });
     }
 };
 
-module.exports = { registerUser, loginUser, getMe, updateProfile, upload };
+// @desc    Change the current user's password
+// @route   PUT /api/auth/change-password
+// @access  Private
+const changePassword = async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'currentPassword and newPassword are required' });
+    }
+    if (newPassword.length < 8) {
+        return res.status(400).json({ message: 'New password must be at least 8 characters' });
+    }
+
+    try {
+        const user = await prisma.user.findUnique({ where: { id: req.user._id } });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        // 400, not 401: the request is properly authenticated (valid JWT) — this
+        // is a wrong secondary credential, not an expired/invalid session. The
+        // frontend's axios interceptor treats any 401 as "session expired" and
+        // force-logs-out, which would otherwise wipe this error off the screen.
+        const isMatch = await verifyPassword(currentPassword, user.password);
+        if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect' });
+
+        await prisma.user.update({
+            where: { id: req.user._id },
+            data: { password: await hashPassword(newPassword) },
+        });
+
+        res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        console.error('changePassword error:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { registerUser, loginUser, getMe, updateProfile, changePassword, upload };

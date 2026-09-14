@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  name           String
+  email          String   @unique
+  password       String
+  bio            String   @default("")
+  profilePicture String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  accounts  Account[]
+  transfers Transfer[]
+}
+
+model Account {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  googleId String
+  email    String
+  picture  String?
+
+  // OAuth tokens. Refresh token is AES-256-CBC encrypted (iv + ciphertext);
+  // access token is short-lived so it's stored in plaintext, matching the
+  // original design (see Backend/utils/encryption.js).
+  accessToken      String?
+  refreshTokenIv   String?
+  refreshTokenData String?
+  scope            String?
+  tokenType        String?
+  expiryDate       Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transfersFrom Transfer[] @relation("sourceAccount")
+  transfersTo   Transfer[] @relation("targetAccount")
+
+  // A user can only link the same Google account once.
+  @@unique([userId, googleId])
+}
+
+enum TransferAction {
+  copy
+  move
+}
+
+enum TransferStatus {
+  pending
+  in_progress
+  completed
+  failed
+}
+
+model Transfer {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Nullable + SetNull so transfer history survives an account being
+  // unlinked later, matching the original Mongoose-ref behaviour where a
+  // dangling reference just populated as null instead of blocking deletion.
+  sourceAccountId String?
+  sourceAccount   Account? @relation("sourceAccount", fields: [sourceAccountId], references: [id], onDelete: SetNull)
+  targetAccountId String?
+  targetAccount   Account? @relation("targetAccount", fields: [targetAccountId], references: [id], onDelete: SetNull)
+
+  fileId        String
+  fileName      String
+  mimeType      String?
+  action        TransferAction
+  status        TransferStatus @default(pending)
+  errorMessage  String?
+  fileSizeBytes Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
