@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 
 const { prisma } = require('../config/db');
 const { encrypt } = require('../utils/encryption');
-const { getDriveClient } = require('../services/googleDriveService');
+const { getDriveClient, getAuthUrl, verifyState } = require('../services/googleDriveService');
 
 // Prisma Client's model delegates (e.g. `prisma.account`) are Proxy-backed,
 // so `Object.getOwnPropertyDescriptor` doesn't see `findFirst` as a real own
@@ -69,5 +69,30 @@ describe('getDriveClient', () => {
         const drive = await getDriveClient('account-123', 'owner-1');
         assert.ok(drive);
         assert.ok(drive.files);
+    });
+});
+
+// Regression test for the OAuth account-linking CSRF fix: /callback must
+// reject a code/state pair that wasn't issued for the requesting user.
+describe('getAuthUrl / verifyState', () => {
+    test('embeds a state param tying the auth URL to the requesting user', () => {
+        const url = getAuthUrl('user-1');
+        const state = new URL(url).searchParams.get('state');
+        assert.ok(state);
+        assert.doesNotThrow(() => verifyState(state, 'user-1'));
+    });
+
+    test('rejects a state issued for a different user', () => {
+        const url = getAuthUrl('user-1');
+        const state = new URL(url).searchParams.get('state');
+        assert.throws(() => verifyState(state, 'attacker-2'), /does not match/);
+    });
+
+    test('rejects a missing state', () => {
+        assert.throws(() => verifyState(undefined, 'user-1'), /Missing OAuth state/);
+    });
+
+    test('rejects a tampered/invalid state', () => {
+        assert.throws(() => verifyState('not-a-real-token', 'user-1'), /Invalid or expired/);
     });
 });

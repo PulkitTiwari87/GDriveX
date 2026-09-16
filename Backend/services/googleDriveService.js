@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const jwt = require('jsonwebtoken');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { prisma } = require('../config/db');
 
@@ -8,8 +9,12 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.GENERIC_REDIRECT_URI
 );
 
-// Generate a URL for the user to select their Google Account and authorize
-const getAuthUrl = () => {
+// Generate a URL for the user to select their Google Account and authorize.
+// `state` is a short-lived signed token binding this OAuth flow to the
+// requesting user, so /callback can reject a code/state pair that didn't
+// originate from a flow we started for this session (OAuth CSRF / account
+// linking CSRF protection).
+const getAuthUrl = (userId) => {
     const scopes = [
         'https://www.googleapis.com/auth/userinfo.profile',
         'https://www.googleapis.com/auth/userinfo.email',
@@ -17,11 +22,32 @@ const getAuthUrl = () => {
         // Add 'https://www.googleapis.com/auth/drive.metadata.readonly' for read-only if needed
     ];
 
+    const state = jwt.sign({ uid: userId, purpose: 'oauth_state' }, process.env.JWT_SECRET, {
+        expiresIn: '10m',
+    });
+
     return oauth2Client.generateAuthUrl({
         access_type: 'offline', // Crucial for getting a refresh token
         scope: scopes,
         prompt: 'consent', // Force consent prompt to ensure refresh token is returned
+        state,
     });
+};
+
+// Verify a state token returned by Google matches the user who started this
+// OAuth flow. Throws if missing, expired, tampered with, or issued for a
+// different user.
+const verifyState = (state, userId) => {
+    if (!state) throw new Error('Missing OAuth state parameter');
+    let decoded;
+    try {
+        decoded = jwt.verify(state, process.env.JWT_SECRET);
+    } catch {
+        throw new Error('Invalid or expired OAuth state parameter');
+    }
+    if (decoded.purpose !== 'oauth_state' || decoded.uid !== userId) {
+        throw new Error('OAuth state parameter does not match the current session');
+    }
 };
 
 const getTokensFromCode = async (code) => {
@@ -75,6 +101,7 @@ const getDriveClient = async (accountId, userId) => {
 
 module.exports = {
     getAuthUrl,
+    verifyState,
     getTokensFromCode,
     getDriveClient,
 };

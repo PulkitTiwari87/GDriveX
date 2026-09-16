@@ -1,6 +1,6 @@
 const { google } = require('googleapis');
 const { prisma } = require('../config/db');
-const { getAuthUrl, getTokensFromCode, getDriveClient } = require('../services/googleDriveService');
+const { getAuthUrl, verifyState, getTokensFromCode, getDriveClient } = require('../services/googleDriveService');
 const { encrypt } = require('../utils/encryption');
 const { toClient, toClientList } = require('../utils/serialize');
 const fs = require('fs');
@@ -18,14 +18,20 @@ const PUBLIC_ACCOUNT_FIELDS = {
 // @desc    Get Google OAuth URL
 // @route   GET /api/drive/auth-url
 const getGoogleAuthUrl = (req, res) => {
-    const url = getAuthUrl();
+    const url = getAuthUrl(req.user._id);
     res.json({ url });
 };
 
 // @desc    Link Google Account (Callback)
 // @route   POST /api/drive/callback
 const linkGoogleAccount = async (req, res) => {
-    const { code } = req.body;
+    const { code, state } = req.body;
+
+    try {
+        verifyState(state, req.user._id);
+    } catch (error) {
+        return res.status(400).json({ message: error.message });
+    }
 
     try {
         const tokens = await getTokensFromCode(code);

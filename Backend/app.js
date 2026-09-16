@@ -45,10 +45,11 @@ app.use('/uploads', express.static(require('path').join(__dirname, 'uploads')));
 // This matches the GENERIC_REDIRECT_URI in .env
 // It receives the code from Google and redirects to the Frontend to handle it
 app.get('/auth/google/callback', (req, res) => {
-    const { code } = req.query;
+    const { code, state } = req.query;
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     if (code) {
-        res.redirect(`${clientUrl}/auth/callback?code=${code}`);
+        const stateParam = state ? `&state=${encodeURIComponent(state)}` : '';
+        res.redirect(`${clientUrl}/auth/callback?code=${encodeURIComponent(code)}${stateParam}`);
     } else {
         res.redirect(`${clientUrl}/?error=no_code`);
     }

@@ -97,4 +97,3 @@ on Vercel/Render as configured in `DEPLOYMENT.md`.
 - Notification preferences in Settings are UI-only placeholders — no
   notification delivery system exists yet.
 - No password-strength meter beyond a minimum length check.
-- The frontend bundle is a single ~735 KB chunk; not yet code-split.

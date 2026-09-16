@@ -7,6 +7,7 @@ const AuthCallback = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const code = searchParams.get('code');
+    const state = searchParams.get('state');
     const processed = useRef(false);
 
     useEffect(() => {
@@ -15,7 +16,7 @@ const AuthCallback = () => {
             processed.current = true;
 
             try {
-                await api.post('/drive/callback', { code });
+                await api.post('/drive/callback', { code, state });
                 navigate('/dashboard?success=drive_linked');
             } catch (error) {
                 console.error('Failed to link account', error);
@@ -24,7 +25,7 @@ const AuthCallback = () => {
         };
 
         linkAccount();
-    }, [code, navigate]);
+    }, [code, state, navigate]);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 flex-col transition-colors duration-300">

@@ -23,6 +23,16 @@
       `accountId`, letting any authenticated user act on another user's linked Google account
       by passing its ObjectId — fixed by making `userId` a required parameter with no insecure
       fallback. Covered by `Backend/test/googleDriveService.test.js`.
+- [x] **OAuth state (CSRF)**: `GET /api/drive/auth-url` now embeds a short-lived signed
+      `state` token (JWT, 10 min expiry) binding the flow to the requesting user's id.
+      `POST /api/drive/callback` verifies it via `verifyState(state, userId)` before exchanging
+      the code, rejecting the request with 400 if `state` is missing, expired, tampered with,
+      or was issued for a different user. Previously the account-linking flow had no `state`
+      param at all, so an attacker could start their own OAuth flow, capture the `code`, and
+      trick a logged-in victim into submitting it — silently linking the attacker's Google
+      account to the victim's GDriveX profile (any file the victim then uploaded to that
+      "linked" account would land in the attacker's Drive). Covered by
+      `Backend/test/googleDriveService.test.js`.
 
 ## 4. Production Readiness
 - [ ] **HTTPS**: Ensure your deployment platform (Render/Vercel) serves over HTTPS.
