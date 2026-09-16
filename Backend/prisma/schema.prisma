@@ -87,4 +87,6 @@ model Transfer {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([sourceAccountId])
+  @@index([targetAccountId])
 }
